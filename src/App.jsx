@@ -170,7 +170,8 @@ ${finalTopic}
       });
 
       const data = await res.json();
-      const text = data.content.filter((b) => b.type === "text").map((b) => b.text).join("\n").trim();
+      const text = (data.content || []).filter((b) => b && b.type === "text").map((b) => b.text).join("\n").trim();
+if (!text) throw new Error(data.error?.message || JSON.stringify(data));
       setArticle(text);
       setActiveMeta({ topic: finalTopic, cat });
       setTimeout(() => outputRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
