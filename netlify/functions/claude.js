@@ -1,5 +1,6 @@
+const https = require("https");
+
 exports.handler = async (event) => {
-  // POSTのみ受け付ける
   if (event.httpMethod !== "POST") {
     return { statusCode: 405, body: "Method Not Allowed" };
   }
@@ -9,30 +10,41 @@ exports.handler = async (event) => {
     return { statusCode: 500, body: JSON.stringify({ error: "API key not configured" }) };
   }
 
-  try {
-    const body = JSON.parse(event.body);
+  return new Promise((resolve) => {
+    const body = event.body;
 
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
+    const options = {
+      hostname: "api.anthropic.com",
+      path: "/v1/messages",
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "x-api-key": apiKey,
         "anthropic-version": "2023-06-01",
+        "Content-Length": Buffer.byteLength(body),
       },
-      body: JSON.stringify(body),
+    };
+
+    const req = https.request(options, (res) => {
+      let data = "";
+      res.on("data", (chunk) => { data += chunk; });
+      res.on("end", () => {
+        resolve({
+          statusCode: res.statusCode,
+          headers: { "Content-Type": "application/json" },
+          body: data,
+        });
+      });
     });
 
-    const data = await response.json();
+    req.on("error", (e) => {
+      resolve({
+        statusCode: 500,
+        body: JSON.stringify({ error: e.message }),
+      });
+    });
 
-    return {
-      statusCode: response.status,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    };
-  } catch (error) {
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: error.message }),
-    };
-  }
+    req.write(body);
+    req.end();
+  });
 };
